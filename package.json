@@ -1,0 +1,17 @@
+{
+  "name": "sub2api-admin-mcp",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "MCP server for Sub2API admin CRUD and query endpoints.",
+  "scripts": {
+    "start": "node server.mjs",
+    "print-tools": "node server.mjs --print-tools",
+    "print-resources": "node server.mjs --print-resources",
+    "check": "node --check server.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.28.0",
+    "zod": "^4.3.6"
+  }
+}

@@ -1,0 +1,14 @@
+﻿{
+  "mcpServers": {
+    "sub2api-admin": {
+      "command": "node",
+      "args": [
+        "C:/path/to/sub2api/tools/sub2api-admin-mcp/server.mjs"
+      ],
+      "env": {
+        "SUB2API_BASE_URL": "http://127.0.0.1:8080",
+        "SUB2API_ADMIN_API_KEY": "replace-with-your-admin-api-key"
+      }
+    }
+  }
+}
