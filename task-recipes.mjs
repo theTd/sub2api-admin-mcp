@@ -38,7 +38,8 @@ export const taskRecipes = [
     ],
     avoid_patterns: [
       "Do not start with dashboard.snapshot_v2 when the user explicitly wants per-account breakdown.",
-      "Do not loop accounts.today_stats for every account unless batch_today_stats is unavailable or stale."
+      "Do not loop accounts.today_stats for every account unless batch_today_stats is unavailable or stale.",
+      "Do not use this workflow when the user is asking about remaining quota windows or realtime account availability."
     ],
     workflow: [
       step(
@@ -166,6 +167,104 @@ export const taskRecipes = [
     ]
   },
   {
+    id: "user_balance_overview",
+    title: "User Balance Overview",
+    summary: "Inspect stored user balance and status without confusing balance with usage spend.",
+    intent_aliases: [
+      "user balance overview",
+      "user balance remaining",
+      "remaining user balance",
+      "which users have balance",
+      "用户余额",
+      "余额剩余",
+      "剩余余额"
+    ],
+    read_only: true,
+    avoids_n_plus_one: true,
+    output_shape: ["user_id", "email", "balance", "status"],
+    preferred_endpoints: [
+      endpoint("users", "operation", "list"),
+      endpoint("users", "operation", "get"),
+      endpoint("users", "action", "balance_history")
+    ],
+    avoid_patterns: [
+      "Do not start with dashboard.users_ranking or dashboard.users_usage when the task is about stored balance rather than usage spend."
+    ],
+    workflow: [
+      step(
+        "List users",
+        "sub2api_admin_list",
+        { resource: "users", query: { page: 1, page_size: 100 } },
+        "Inspect current user rows and identify the relevant user ids."
+      ),
+      step(
+        "Get one user",
+        "sub2api_admin_get",
+        { resource: "users", id: "<user id>" },
+        "Use when you need one user's full current balance or profile fields.",
+        { optional: true }
+      ),
+      step(
+        "Balance history",
+        "sub2api_admin_action",
+        { resource: "users", action: "balance_history", id: "<user id>", query: { page: 1, page_size: 50 } },
+        "Use only when the user asks how the stored balance changed over time.",
+        { optional: true }
+      )
+    ]
+  },
+  {
+    id: "account_quota_and_availability",
+    title: "Account Quota And Availability Overview",
+    summary: "Separate provider quota-window signals from realtime schedulability when users ask what remains or which accounts are usable now.",
+    intent_aliases: [
+      "remaining account quota",
+      "account quota remaining",
+      "remaining quota window for accounts",
+      "available accounts now",
+      "which accounts are available now",
+      "usable accounts now",
+      "账号剩余额度",
+      "账号还能不能用",
+      "可用账号",
+      "剩余窗口额度"
+    ],
+    read_only: true,
+    avoids_n_plus_one: true,
+    output_shape: ["account_id", "available", "rate_limited", "quota_window"],
+    preferred_endpoints: [
+      endpoint("accounts", "operation", "list"),
+      endpoint("ops", "action", "account_availability")
+    ],
+    fallback_endpoints: [
+      endpoint("accounts", "action", "get_temp_unschedulable")
+    ],
+    avoid_patterns: [
+      "Do not treat accounts.today_stats or batch_today_stats as a direct answer for realtime availability or remaining quota windows."
+    ],
+    workflow: [
+      step(
+        "List accounts",
+        "sub2api_admin_list",
+        { resource: "accounts", query: { page: 1, page_size: 100, lite: "true" } },
+        "Inspect account rows for provider-specific quota or usage-window signals."
+      ),
+      step(
+        "Availability overlay",
+        "sub2api_admin_action",
+        { resource: "ops", action: "account_availability" },
+        "Check realtime schedulability, rate limits, and temporary unschedulable state."
+      ),
+      step(
+        "Unschedulable detail",
+        "sub2api_admin_action",
+        { resource: "accounts", action: "get_temp_unschedulable", id: "<account id>" },
+        "Use only when one account needs a deeper temporary-unschedulable explanation.",
+        { optional: true }
+      )
+    ]
+  },
+  {
     id: "account_inventory_overview",
     title: "Account Inventory Overview",
     summary: "List upstream accounts with status and lightweight metadata before any deeper drilldown.",
@@ -185,7 +284,8 @@ export const taskRecipes = [
       endpoint("ops", "action", "account_availability")
     ],
     avoid_patterns: [
-      "Do not start with dashboard or usage aggregates when the user asks for account inventory or status rather than spend."
+      "Do not start with dashboard or usage aggregates when the user asks for account inventory or status rather than spend.",
+      "Do not answer remaining quota or realtime usability questions with inventory alone; pair it with ops.account_availability."
     ],
     workflow: [
       step(

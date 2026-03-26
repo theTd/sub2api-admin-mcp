@@ -88,6 +88,7 @@ export const GLOBAL_DISCOVERY_TIPS = [
   "Prefer documented query/body keys from describe_resources or find_capability instead of guessing field names.",
   "Use find_capability when you only know an intent, keyword, or output you want.",
   "CRUD operations map to dedicated tools such as sub2api_admin_list or sub2api_admin_get; only non-CRUD endpoints use sub2api_admin_action.",
+  "When a question mixes remaining quota with realtime usability, combine inventory/list endpoints with health or availability endpoints instead of assuming one response answers both.",
   "Mutation endpoints are marked as mutating; double-check ids, path_params, and body fields before calling them."
 ]
 
@@ -398,7 +399,8 @@ export const resourceDocs = {
         response_notes: [
           "When you only need identifiers and status, pass lite=true to reduce payload size.",
           "MCP masks nested credentials in account list/get responses before returning them to the agent.",
-          "Account state fields such as rate_limited_at, rate_limit_reset_at, and schedulable are forwarded from the admin API; prefer ops.account_availability when you need a realtime availability or rate-limit judgement."
+          "Account state fields such as rate_limited_at, rate_limit_reset_at, and schedulable are forwarded from the admin API; prefer ops.account_availability when you need a realtime availability or rate-limit judgement.",
+          "Some deployments expose provider-specific quota or window fields in account rows; treat them as quota-window signals and combine them with ops.account_availability rather than assuming they equal realtime usability."
         ],
         query: {
           strict: true,
@@ -725,6 +727,7 @@ export const resourceDocs = {
     operations: {
       list: {
         source: `${sourceRefs.users}#list`,
+        preferred_for: ["user inventory", "user lookup", "stored user balance overview"],
         starter_args: {
           query: {
             page: 1,
@@ -744,6 +747,7 @@ export const resourceDocs = {
         },
         notes: [
           "Attribute filters use literal query keys such as attr[12]. They are passed through as-is.",
+          "For stored balance or status questions, prefer users.list or users.get before dashboard usage or spending endpoints.",
           "If display names are not distinctive in your deployment, correlate on stable ids via users.get, dashboard.users_usage or dashboard.users_ranking, or usage.search_api_keys instead of relying on the list name field alone."
         ]
       },
@@ -1253,12 +1257,15 @@ export const resourceDocs = {
       },
       account_availability: {
         source: `${sourceRefs.ops}#getAccountAvailabilityStats`,
-        preferred_for: ["account availability", "schedulable accounts", "rate limited accounts", "which accounts are healthy"],
+        preferred_for: ["account availability", "schedulable accounts", "rate limited accounts", "which accounts are healthy", "available accounts now", "remaining usable accounts"],
         freshness: "realtime",
         returns_breakdown_by: "account_id",
         supports_bulk: true,
         avoids_n_plus_one: true,
-        response_fields: ["account_id", "available", "rate_limited", "temp_unschedulable", "error"]
+        response_fields: ["account_id", "available", "rate_limited", "temp_unschedulable", "error"],
+        notes: [
+          "Use this to answer realtime usability questions; it complements, but does not replace, any provider-specific quota or window fields returned by accounts.list."
+        ]
       },
       realtime_traffic: {
         source: `${sourceRefs.ops}#getRealtimeTraffic`,

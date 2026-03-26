@@ -950,8 +950,9 @@ const BREAKDOWN_QUERY_HINTS = [
 ]
 
 const HEALTH_QUERY_HINTS = [
-  "health", "healthy", "availability", "status", "capacity", "schedulable",
-  "健康", "可用", "状态", "容量", "可调度", "限流"
+  "health", "healthy", "availability", "available", "status", "capacity", "schedulable",
+  "usable", "remaining", "left", "quota", "window", "reset",
+  "健康", "可用", "状态", "容量", "可调度", "限流", "剩余", "额度", "窗口", "还能用"
 ]
 
 const ERROR_QUERY_HINTS = [

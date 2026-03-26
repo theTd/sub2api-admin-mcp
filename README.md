@@ -119,6 +119,7 @@ Replace the example script path above with your own local absolute path.
 - Documented `call_template` payloads can now include starter query/body args for common safe defaults such as `page_size`, `lite=true`, or `with_count=true`, so agents need fewer exploratory calls.
 - Compact `describe_resources` output now includes `operation_tools` and `operation_summaries` so callers can route an operation to the correct MCP tool without expanding every resource into full detail.
 - For per-user or per-API-key cost snapshots, prefer `dashboard.users_usage` or `dashboard.api_keys_usage`; the matching `*_trend` endpoints are better suited to trend and chart views than guaranteed cost snapshots.
+- For account questions about what remains, what is usable now, or whether quota windows still allow scheduling, combine `accounts.list` with `ops.account_availability` instead of treating usage/today stats as a complete answer.
 - For filters like `attr[12]`, use the literal key in `query`.
 - High-signal resources such as `usage`, `dashboard`, `accounts`, `users`, `groups`, `proxies`, `subscriptions`, `settings`, `backups`, and `data_management` include richer metadata derived from the admin frontend API layer.
 - Task-oriented discovery now understands common goals such as account usage reports, API key ranking, group usage, account inventory, error triage, proxy health checks, subscription inspection, backup health checks, and batch account refreshes.
