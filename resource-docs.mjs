@@ -87,6 +87,7 @@ const sourceRefs = {
 export const GLOBAL_DISCOVERY_TIPS = [
   "Prefer documented query/body keys from describe_resources or find_capability instead of guessing field names.",
   "Use find_capability when you only know an intent, keyword, or output you want.",
+  "CRUD operations map to dedicated tools such as sub2api_admin_list or sub2api_admin_get; only non-CRUD endpoints use sub2api_admin_action.",
   "Mutation endpoints are marked as mutating; double-check ids, path_params, and body fields before calling them."
 ]
 
@@ -94,7 +95,8 @@ export const resourceDocs = {
   dashboard: {
     notes: [
       "Dashboard actions are read-only aggregation endpoints and are usually better than N+1 per-id loops when you need rankings or batch summaries.",
-      "For batch user or API key cost snapshots, prefer dashboard.users_usage or dashboard.api_keys_usage over per-record stats loops."
+      "For batch user or API key cost snapshots, prefer dashboard.users_usage or dashboard.api_keys_usage over per-record stats loops.",
+      "Trend endpoints such as api_keys_trend and users_trend are best for charting or comparisons; use the matching *_usage action when you need a per-entity cost snapshot."
     ],
     actions: {
       snapshot_v2: {
@@ -161,7 +163,11 @@ export const resourceDocs = {
             granularity: enumParam(["day", "hour"], "Aggregation granularity."),
             limit: integerParam("Maximum number of keys to return.")
           })
-        }
+        },
+        notes: [
+          "Use this for API key trend slices and ranking-oriented views.",
+          "If you need a reliable per-key cost snapshot, prefer dashboard.api_keys_usage first and fall back to usage.stats(api_key_id, start_date, end_date) only for precise validation."
+        ]
       },
       users_trend: {
         source: `${sourceRefs.dashboard}#getUserUsageTrend`,
@@ -206,7 +212,11 @@ export const resourceDocs = {
             endpoint_type: enumParam(["inbound", "upstream", "path"], "Endpoint dimension."),
             limit: integerParam("Maximum users to return.")
           }
-        }
+        },
+        notes: [
+          "When debugging an empty result, start with only start_date and end_date, then add group, model, or endpoint filters one at a time.",
+          "If the response is still empty, cross-check the same window with dashboard.users_ranking, dashboard.users_usage, or usage.stats before assuming the action is broken."
+        ]
       },
       users_usage: {
         source: `${sourceRefs.dashboard}#getBatchUsersUsage`,
@@ -387,7 +397,8 @@ export const resourceDocs = {
         },
         response_notes: [
           "When you only need identifiers and status, pass lite=true to reduce payload size.",
-          "MCP masks nested credentials in account list/get responses before returning them to the agent."
+          "MCP masks nested credentials in account list/get responses before returning them to the agent.",
+          "Account state fields such as rate_limited_at, rate_limit_reset_at, and schedulable are forwarded from the admin API; prefer ops.account_availability when you need a realtime availability or rate-limit judgement."
         ],
         query: {
           strict: true,
@@ -731,7 +742,10 @@ export const resourceDocs = {
             "attr[<id>]": stringParam("Attribute filter using the literal attr[id] query key.")
           })
         },
-        notes: ["Attribute filters use literal query keys such as attr[12]. They are passed through as-is."]
+        notes: [
+          "Attribute filters use literal query keys such as attr[12]. They are passed through as-is.",
+          "If display names are not distinctive in your deployment, correlate on stable ids via users.get, dashboard.users_usage or dashboard.users_ranking, or usage.search_api_keys instead of relying on the list name field alone."
+        ]
       },
       create: {
         source: `${sourceRefs.users}#create`,

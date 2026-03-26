@@ -19,6 +19,13 @@ const DESCRIBE_VIEW_ALIASES = ["compact", "full", "summary", "catalog", "detail"
 const DESCRIBE_VIEW_ENUM = z.enum(DESCRIBE_VIEW_ALIASES)
 const FLEXIBLE_OBJECT_SCHEMA = z.record(z.string(), z.any())
 const IDENTIFIER_SCHEMA = z.union([z.string(), z.number().int()])
+const CRUD_OPERATION_TO_TOOL = {
+  list: "sub2api_admin_list",
+  get: "sub2api_admin_get",
+  create: "sub2api_admin_create",
+  update: "sub2api_admin_update",
+  delete: "sub2api_admin_delete"
+}
 
 const authState = {
   mode: null,
@@ -671,9 +678,9 @@ function normalizeDescribeView(resourceName, requestedView) {
 }
 
 function compactResourceSummary(resource) {
-  const supportedOperations = Object.entries(resource.operations || {})
+  const supportedOperationEntries = Object.entries(resource.operations || {})
     .filter(([, operation]) => Boolean(operation))
-    .map(([name]) => name)
+  const supportedOperations = supportedOperationEntries.map(([name]) => name)
   const actionNames = Object.keys(resource.actions || {})
 
   return {
@@ -681,8 +688,19 @@ function compactResourceSummary(resource) {
     description: resource.description,
     notes: resource.notes || [],
     operations: supportedOperations,
+    operation_tools: Object.fromEntries(
+      supportedOperationEntries.map(([name, operation]) => [name, operation.tool])
+    ),
+    operation_summaries: Object.fromEntries(
+      supportedOperationEntries.map(([name, operation]) => [name, {
+        tool: operation.tool,
+        method: operation.method,
+        path: operation.path
+      }])
+    ),
     action_names: actionNames,
-    action_count: actionNames.length
+    action_count: actionNames.length,
+    action_tool: actionNames.length ? "sub2api_admin_action" : null
   }
 }
 
@@ -1562,6 +1580,17 @@ async function executeOperation(toolName, args) {
     const actionName = requireString(args.action, "action")
     const action = resource.actions?.[actionName]
     if (!action) {
+      const crudTool = CRUD_OPERATION_TO_TOOL[actionName]
+      if (crudTool) {
+        if (resource[actionName]) {
+          throw new Error(
+            `Resource ${resourceName} does not define action ${actionName}. ${resourceName}.${actionName} is a CRUD operation; call ${crudTool} with top-level resource/query/body args instead.`
+          )
+        }
+        throw new Error(
+          `Resource ${resourceName} does not define action ${actionName}. ${actionName} is a CRUD tool name, but ${resourceName} does not support that CRUD operation.`
+        )
+      }
       throw new Error(`Resource ${resourceName} does not define action ${actionName}`)
     }
     return runNamedOperation(toolName, resourceName, actionName, action, args, args.body, true)

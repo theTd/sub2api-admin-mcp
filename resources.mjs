@@ -139,6 +139,7 @@ function buildExamples(tool, resourceName, operationName, documentation) {
 function buildOperationDocumentation(resourceName, operationName, summary, documentation, tool) {
   const details = {
     ...summary,
+    tool,
     documentation: documentation || null,
     call_template: buildCallTemplate(tool, resourceName, operationName, summary, documentation)
   }
@@ -171,6 +172,55 @@ function summarizeResource(name, spec) {
     )
   }
 
+  const operationEntries = Object.entries({
+    list: spec.list
+      ? buildOperationDocumentation(
+          name,
+          "list",
+          summarizeOperation(spec.list),
+          resourceDocs?.operations?.list || null,
+          "sub2api_admin_list"
+        )
+      : null,
+    get: spec.get
+      ? buildOperationDocumentation(
+          name,
+          "get",
+          summarizeOperation(spec.get),
+          resourceDocs?.operations?.get || null,
+          "sub2api_admin_get"
+        )
+      : null,
+    create: spec.create
+      ? buildOperationDocumentation(
+          name,
+          "create",
+          summarizeOperation(spec.create),
+          resourceDocs?.operations?.create || null,
+          "sub2api_admin_create"
+        )
+      : null,
+    update: spec.update
+      ? buildOperationDocumentation(
+          name,
+          "update",
+          summarizeOperation(spec.update),
+          resourceDocs?.operations?.update || null,
+          "sub2api_admin_update"
+        )
+      : null,
+    delete: spec.delete
+      ? buildOperationDocumentation(
+          name,
+          "delete",
+          summarizeOperation(spec.delete),
+          resourceDocs?.operations?.delete || null,
+          "sub2api_admin_delete"
+        )
+      : null
+  })
+  const operations = Object.fromEntries(operationEntries)
+
   return {
     name,
     description: spec.description,
@@ -180,53 +230,7 @@ function summarizeResource(name, spec) {
       title: recipe.title,
       summary: recipe.summary
     })),
-    operations: {
-      list: spec.list
-        ? buildOperationDocumentation(
-            name,
-            "list",
-            summarizeOperation(spec.list),
-            resourceDocs?.operations?.list || null,
-            "sub2api_admin_list"
-          )
-        : null,
-      get: spec.get
-        ? buildOperationDocumentation(
-            name,
-            "get",
-            summarizeOperation(spec.get),
-            resourceDocs?.operations?.get || null,
-            "sub2api_admin_get"
-          )
-        : null,
-      create: spec.create
-        ? buildOperationDocumentation(
-            name,
-            "create",
-            summarizeOperation(spec.create),
-            resourceDocs?.operations?.create || null,
-            "sub2api_admin_create"
-          )
-        : null,
-      update: spec.update
-        ? buildOperationDocumentation(
-            name,
-            "update",
-            summarizeOperation(spec.update),
-            resourceDocs?.operations?.update || null,
-            "sub2api_admin_update"
-          )
-        : null,
-      delete: spec.delete
-        ? buildOperationDocumentation(
-            name,
-            "delete",
-            summarizeOperation(spec.delete),
-            resourceDocs?.operations?.delete || null,
-            "sub2api_admin_delete"
-          )
-        : null
-    },
+    operations,
     actions
   }
 }

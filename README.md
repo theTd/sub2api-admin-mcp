@@ -110,12 +110,15 @@ Replace the example script path above with your own local absolute path.
 - Run `sub2api_admin_describe_resources` when you know the resource and need the precise call shape, documented params, path placeholders, examples, or warnings.
 - `sub2api_admin_describe_resources` returns a compact catalog by default. Pass `view: "full"` when you need the full resource catalog in one response. Aliases such as `summary`, `detail`, `detailed`, or `actions` are accepted and normalized.
 - When `resource` is provided, `sub2api_admin_describe_resources` defaults to the full detail view for that one resource.
+- CRUD operations do not go through `sub2api_admin_action`. Use the explicit tool named in `operations.<name>.tool`, such as `sub2api_admin_list` for `accounts.list` or `sub2api_admin_get` for `users.get`.
 - Use `id` for routes that use `:id`.
 - Use `path_params` for routes that need placeholders such as `profile_id`, `source_type`, `job_id`, or `idx`.
 - Use `query` for query string filters.
 - Use `body` for JSON payloads on create, update, and action calls.
 - The MCP now performs local validation for documented query and body fields before sending requests. Unknown keys produce either a hard error or a warning depending on how complete the endpoint metadata is.
 - Documented `call_template` payloads can now include starter query/body args for common safe defaults such as `page_size`, `lite=true`, or `with_count=true`, so agents need fewer exploratory calls.
+- Compact `describe_resources` output now includes `operation_tools` and `operation_summaries` so callers can route an operation to the correct MCP tool without expanding every resource into full detail.
+- For per-user or per-API-key cost snapshots, prefer `dashboard.users_usage` or `dashboard.api_keys_usage`; the matching `*_trend` endpoints are better suited to trend and chart views than guaranteed cost snapshots.
 - For filters like `attr[12]`, use the literal key in `query`.
 - High-signal resources such as `usage`, `dashboard`, `accounts`, `users`, `groups`, `proxies`, `subscriptions`, `settings`, `backups`, and `data_management` include richer metadata derived from the admin frontend API layer.
 - Task-oriented discovery now understands common goals such as account usage reports, API key ranking, group usage, account inventory, error triage, proxy health checks, subscription inspection, backup health checks, and batch account refreshes.
