@@ -19,12 +19,33 @@ const DESCRIBE_VIEW_ALIASES = ["compact", "full", "summary", "catalog", "detail"
 const DESCRIBE_VIEW_ENUM = z.enum(DESCRIBE_VIEW_ALIASES)
 const FLEXIBLE_OBJECT_SCHEMA = z.record(z.string(), z.any())
 const IDENTIFIER_SCHEMA = z.union([z.string(), z.number().int()])
+const MIN_CAPABILITY_RESULT_SCORE = 3
+const MIN_CAPABILITY_RECOMMEND_SCORE = 5
 const CRUD_OPERATION_TO_TOOL = {
   list: "sub2api_admin_list",
   get: "sub2api_admin_get",
   create: "sub2api_admin_create",
   update: "sub2api_admin_update",
   delete: "sub2api_admin_delete"
+}
+
+const TOOL_DESCRIPTIONS = {
+  sub2api_admin_describe_resources:
+    "Use this when you know the admin area, such as users, accounts, settings, or ops, but still need the exact CRUD tool, action name, placeholders, supported query or body fields, or example call shape. Omit `resource` to browse the full catalog, or pass one `resource` to inspect it in detail.",
+  sub2api_admin_list:
+    "Use this when the user wants a collection of admin records, such as listing users, accounts, groups, subscriptions, proxies, backups, or other resource rows. Pass `resource` and optional `query` filters, and use `path_params` only for nested collection routes. Do not use this for one record by id or for named actions such as stats, retries, health checks, or exports.",
+  sub2api_admin_get:
+    "Use this when the user wants one admin record or one singleton config object, such as a specific user, account, group, announcement, backup, or settings document. Pass `resource`, provide `id` for item routes that use `:id`, and use `path_params` for non-standard placeholders such as `profile_id` or `source_type`.",
+  sub2api_admin_create:
+    "Use this when the user wants to create a new admin record, such as a user, group, account, proxy, redeem code, promo code, profile, or other collection item. Pass `resource` and a JSON `body`, and include `path_params` only when the create route belongs to a nested collection.",
+  sub2api_admin_update:
+    "Use this when the user wants to modify an existing admin record or replace a singleton config document, such as updating a user, account, group, profile, alert rule, or settings payload. Pass `resource` and a JSON `body`; include `id` for item routes and `path_params` for non-standard placeholders.",
+  sub2api_admin_delete:
+    "Use this when the user wants to remove a deletable admin record, such as a user, group, proxy, code, profile, or other item route. Pass `resource`, then include `id` or `path_params` for the target. Do not use this for cleanup, reset, retry, or other named actions that are exposed through `sub2api_admin_action`.",
+  sub2api_admin_action:
+    "Use this for named non-CRUD admin operations such as stats, usage reports, health checks, availability checks, retries, imports, exports, resets, batch jobs, sync tasks, or OAuth helper flows. Pass the owning `resource` and exact `action` name, then add `id`, `path_params`, `query`, or `body` only when that action requires them. If you only know the user goal and not the route name, call `sub2api_admin_find_capability` first.",
+  sub2api_admin_find_capability:
+    "Use this first when the user describes a task in natural language, such as checking today's account usage, finding available accounts, reviewing errors, exporting backups, or inspecting a setting, but does not know the exact resource or action name. Pass the user intent in `query`; this tool returns the best matching recipe or endpoint, why it fits, and a starter call template."
 }
 
 const authState = {
@@ -91,7 +112,7 @@ const capabilitySearchArgsSchema = z.object({
 const TOOL_DEFINITIONS = [
   {
     name: "sub2api_admin_describe_resources",
-    description: "Describe the supported admin resources, CRUD coverage, and named actions for this MCP server.",
+    description: TOOL_DESCRIPTIONS.sub2api_admin_describe_resources,
     inputSchema: {
       type: "object",
       properties: {
@@ -111,7 +132,7 @@ const TOOL_DEFINITIONS = [
   },
   {
     name: "sub2api_admin_list",
-    description: "Run a list or collection query for an admin resource.",
+    description: TOOL_DESCRIPTIONS.sub2api_admin_list,
     inputSchema: {
       type: "object",
       properties: {
@@ -137,7 +158,7 @@ const TOOL_DEFINITIONS = [
   },
   {
     name: "sub2api_admin_get",
-    description: "Get a single admin resource record or singleton config resource.",
+    description: TOOL_DESCRIPTIONS.sub2api_admin_get,
     inputSchema: {
       type: "object",
       properties: {
@@ -167,7 +188,7 @@ const TOOL_DEFINITIONS = [
   },
   {
     name: "sub2api_admin_create",
-    description: "Create a new admin resource record.",
+    description: TOOL_DESCRIPTIONS.sub2api_admin_create,
     inputSchema: {
       type: "object",
       properties: {
@@ -193,7 +214,7 @@ const TOOL_DEFINITIONS = [
   },
   {
     name: "sub2api_admin_update",
-    description: "Update an admin resource record or singleton config resource.",
+    description: TOOL_DESCRIPTIONS.sub2api_admin_update,
     inputSchema: {
       type: "object",
       properties: {
@@ -228,7 +249,7 @@ const TOOL_DEFINITIONS = [
   },
   {
     name: "sub2api_admin_delete",
-    description: "Delete an admin resource record.",
+    description: TOOL_DESCRIPTIONS.sub2api_admin_delete,
     inputSchema: {
       type: "object",
       properties: {
@@ -258,7 +279,7 @@ const TOOL_DEFINITIONS = [
   },
   {
     name: "sub2api_admin_action",
-    description: "Run a named non-CRUD admin action such as stats, batch jobs, resets, or OAuth helpers.",
+    description: TOOL_DESCRIPTIONS.sub2api_admin_action,
     inputSchema: {
       type: "object",
       properties: {
@@ -297,7 +318,7 @@ const TOOL_DEFINITIONS = [
   },
   {
     name: "sub2api_admin_find_capability",
-    description: "Search resources and actions by intent, keyword, path, or parameter name and return recommended MCP call templates.",
+    description: TOOL_DESCRIPTIONS.sub2api_admin_find_capability,
     inputSchema: {
       type: "object",
       properties: {
@@ -1363,6 +1384,24 @@ function summarizeRecommendedMatch(match) {
   }
 }
 
+function buildNoCapabilityRecommendation(topMatch) {
+  const note = "No high-confidence capability match was found. Rephrase the query with the admin entity, such as accounts, users, groups, proxies, backups, settings, or ops, and the task you want to perform."
+  if (!topMatch) {
+    return {
+      note
+    }
+  }
+
+  return {
+    note,
+    closest_match: {
+      kind: topMatch.kind,
+      label: topMatch.kind === "recipe" ? topMatch.title : `${topMatch.resource}.${topMatch.name}`,
+      score: topMatch.score
+    }
+  }
+}
+
 function buildCapabilitySearchPayload({ query, limit = 10, includeExamples = false }) {
   const context = buildSearchContext(query)
   const resources = listResources()
@@ -1470,6 +1509,12 @@ function buildCapabilitySearchPayload({ query, limit = 10, includeExamples = fal
     return leftLabel.localeCompare(rightLabel)
   })
 
+  const visibleMatches = matches.filter((match) => match.score >= MIN_CAPABILITY_RESULT_SCORE).slice(0, limit)
+  const topVisibleMatch = visibleMatches[0] || null
+  const recommendedMatch = topVisibleMatch && topVisibleMatch.score >= MIN_CAPABILITY_RECOMMEND_SCORE
+    ? topVisibleMatch
+    : null
+
   return {
     tool: "sub2api_admin_find_capability",
     query,
@@ -1491,8 +1536,9 @@ function buildCapabilitySearchPayload({ query, limit = 10, includeExamples = fal
       wants_logs: context.wantsLogs,
       primary_entity: context.primaryEntity
     },
-    recommended: summarizeRecommendedMatch(matches[0] || null),
-    results: matches.slice(0, limit)
+    recommended: summarizeRecommendedMatch(recommendedMatch),
+    guidance: recommendedMatch ? null : buildNoCapabilityRecommendation(matches[0] || null),
+    results: visibleMatches
   }
 }
 
@@ -1734,7 +1780,7 @@ function createMcpServer() {
   const server = new McpServer(SERVER_INFO)
 
   server.registerTool("sub2api_admin_describe_resources", {
-    description: "Describe the supported admin resources, CRUD coverage, and named actions for this MCP server.",
+    description: TOOL_DESCRIPTIONS.sub2api_admin_describe_resources,
     inputSchema: describeResourcesArgsSchema
   }, async ({ resource, view }) => {
     try {
@@ -1749,37 +1795,37 @@ function createMcpServer() {
   })
 
   server.registerTool("sub2api_admin_list", {
-    description: "Run a list or collection query for an admin resource.",
+    description: TOOL_DESCRIPTIONS.sub2api_admin_list,
     inputSchema: listArgsSchema
   }, async (args) => executeWithResult("sub2api_admin_list", args))
 
   server.registerTool("sub2api_admin_get", {
-    description: "Get a single admin resource record or singleton config resource.",
+    description: TOOL_DESCRIPTIONS.sub2api_admin_get,
     inputSchema: getArgsSchema
   }, async (args) => executeWithResult("sub2api_admin_get", args))
 
   server.registerTool("sub2api_admin_create", {
-    description: "Create a new admin resource record.",
+    description: TOOL_DESCRIPTIONS.sub2api_admin_create,
     inputSchema: createArgsSchema
   }, async (args) => executeWithResult("sub2api_admin_create", args))
 
   server.registerTool("sub2api_admin_update", {
-    description: "Update an admin resource record or singleton config resource.",
+    description: TOOL_DESCRIPTIONS.sub2api_admin_update,
     inputSchema: updateArgsSchema
   }, async (args) => executeWithResult("sub2api_admin_update", args))
 
   server.registerTool("sub2api_admin_delete", {
-    description: "Delete an admin resource record.",
+    description: TOOL_DESCRIPTIONS.sub2api_admin_delete,
     inputSchema: deleteArgsSchema
   }, async (args) => executeWithResult("sub2api_admin_delete", args))
 
   server.registerTool("sub2api_admin_action", {
-    description: "Run a named non-CRUD admin action such as stats, batch jobs, resets, or OAuth helpers.",
+    description: TOOL_DESCRIPTIONS.sub2api_admin_action,
     inputSchema: actionArgsSchema
   }, async (args) => executeWithResult("sub2api_admin_action", args))
 
   server.registerTool("sub2api_admin_find_capability", {
-    description: "Search resources and actions by intent, keyword, path, or parameter name and return recommended MCP call templates.",
+    description: TOOL_DESCRIPTIONS.sub2api_admin_find_capability,
     inputSchema: capabilitySearchArgsSchema
   }, async (args) => executeWithResult("sub2api_admin_find_capability", args))
 
